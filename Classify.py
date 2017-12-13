@@ -1,4 +1,7 @@
+from sklearn.model_selection import KFold
+from sklearn.naive_bayes import BernoulliNB
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.svm import LinearSVC
 from sklearn.metrics import accuracy_score
 
 import numpy as np
@@ -6,43 +9,61 @@ import numpy as np
 class Classify(object):
     def __init__(self):
         self.number_fold = 3
-        self.splitPerFold = 700 // 3
 
-        self.batch = {}
-        
-        self.batch['X'] = []
-        self.batch['Y'] = []
+    def splitToMiniBatches(self, negative, positive, indexOfTest):
+        batch = {'fold' : [], 'X' : [], 'Y' : []}
 
-    def prepare(self, corpus):
-        #Create batches
+        split = len(negative) // self.number_fold
+
+        #Create mini batches
         for i in range(self.number_fold):
-            neg = corpus[i * self.splitPerFold : i * self.splitPerFold + self.splitPerFold]
-            print(neg)
-            pos = corpus[i * self.splitPerFold + 699 : i * self.splitPerFold + self.splitPerFold + 699]
-            print(pos)
-            self.batch['X'].append(np.concatenate(neg, pos))
-            self.batch['Y'].append(np.zeros(self.splitPerFold), np.ones(self.splitPerFold))
-            print(self.batch['X'][0])
-            print(self.batch['Y'])
+            mergedlist = []
 
-    def naiveBayesClassifier(self):
-        accuracy = 0
+            batch['fold'].append(i)
+            
+            #Split to equal sized batch, maintaining balance from neg and pos
+            neg = negative[i * split : i * split + split]
+            #print(len(neg))
+            pos = positive[i * split : i * split + split]
+            #print(len(pos))
+            
+            mergedlist.extend(neg)
+            mergedlist.extend(pos)
+            batch['X'].append(mergedlist)
+            #print(len(self.batch['X'][i]))
 
-        #ITO NA, RUN 3 TIMES, GET AVERAGE
-        for n in range(number_fold):
-            x_train = []
-            y_train = []
-            x_test = []
-            y_test = []
+            batch['Y'].append(np.append(np.zeros(split), np.ones(split)))
+            #print(len(self.batch['Y'][i]))
 
-            MultinomialNB().fit(x_train, y_train)
-            accuracy += accuracy_score(MultinomialNB().predict(x_test), y_test)
-            accuracy_naivebayes = accuracy / number_fold
+        batch['fold'] = np.array(batch['fold'])
+        batch['X'] = np.array(batch['X'])
+        batch['Y'] = np.array(batch['Y'])
 
-        print(accuracy_naivebayes)
+        x_train = batch['X'][batch['fold'] != i]
+        y_train = batch['Y'][batch['fold'] != i]
 
-    def SVM(self):
-        return null
+        x_test = batch['X'][i]
+        y_test = batch['Y'][i]
 
-    def maxEntropy(self):
-        return null
+        #print(x_test.shape)
+        #print(y_test.shape)
+
+        return x_train, x_test, y_train, y_test
+    
+    def naiveBayesClassifier(self, x_train, x_test, y_train, y_test):
+        bernoulliNB = BernoulliNB()
+        bernoulliNB.fit(x_train.reshape(x_train.shape[0] * x_train.shape[1], -1), np.ravel(y_train.reshape(y_train.shape[0] * y_train.shape[1], -1)))
+        accuracy = accuracy_score(bernoulliNB.predict(x_test), y_test)
+        
+        #print("Accuracy for 1 fold in Naive Bayes: ", accuracy)
+
+        return accuracy
+
+    def SVMClassifier(self, x_train, x_test, y_train, y_test):
+        linearSVM = LinearSVC()
+        linearSVM.fit(x_train.reshape(x_train.shape[0] * x_train.shape[1], -1), np.ravel(y_train.reshape(y_train.shape[0] * y_train.shape[1], -1)))
+        accuracy = accuracy_score(linearSVM.predict(x_test), y_test)
+    
+        #print("Accuracy for 1 fold in SVM: ", accuracy)
+
+        return accuracy
